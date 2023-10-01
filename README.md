@@ -1,11 +1,14 @@
-```markdown
-# Idolchamp Voting Automation
+# Idolchamp utilities tools
 
-This Python script automates the voting process on Idolchamp. It uses various utilities and libraries to cast votes efficiently. 
+For voting and registration.
 
 ## Prerequisites
 
 Before you can run the script, you'll need to set up the following prerequisites:
+- Proxy
+    - data.csv
+    - user_agents.csv
+- DB for accounts
 
 ### 1. Python
 
