@@ -1,0 +1,20 @@
+# Ignore .env file
+.env
+
+# Ignore .csv file
+*.csv
+
+# Ignore config.ini
+config.ini
+
+# Ignore log files
+*.log
+
+# Ignore Python bytecode files
+*.pyc
+
+# Ignore __pycache__ directories
+__pycache__/
+
+# Ignore Visual Studio Code settings
+.vscode/
