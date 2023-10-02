@@ -45,6 +45,10 @@ total_time = 0
 account_time = 0
 account_vote_count = 0
 
+# NTFY Config
+NTFY_HOST=config.get('settings', 'NTFY_HOST')
+NTFY_TOPIC=config.get('settings', 'NTFY_TOPIC')
+
 # DB Config
 IDC_TABLE = config.get('settings', 'IDC_TABLE')
 IDC_SELECT = config.get('settings', 'IDC_SELECT')
@@ -143,7 +147,7 @@ def lambda_handler(event, context):
     if total_votes_casted > 0:
         global total_time
         logger.info(f"total_time: {total_time}, average: {total_time/total_votes_casted}")
-    return {
+    json_response = {
         "total_votes": f"{total_votes}",
         "vote_id": f"{vote_id}",
         "vote_item_id": f"{vote_item_id}",
@@ -152,6 +156,12 @@ def lambda_handler(event, context):
         "start_time": start_time.strftime('%Y-%m-%d %H:%M:%S'),  # Format the datetime as a string
         "end_time": end_time.strftime('%Y-%m-%d %H:%M:%S')  # Format the datetime as a string
     }
+    if NTFY_HOST and NTFY_TOPIC:
+        NTFY_URL = f"{NTFY_HOST}{NTFY_TOPIC}"
+        message = f"# updates \n_____\n*{start_time.strftime('%Y-%m-%d %H:%M:%S')}* to *{end_time.strftime('%Y-%m-%d %H:%M:%S')}*\nAccounts used: {total_accounts}\n**Votes Casted: {total_votes_casted}**"
+        #logger.info(f"Sending message to {NTFY_URL}: {message}")
+        IdolchampUtility.send_message(NTFY_URL, message)
+    return json_response
 def cast_vote(token, vote_item_id, device_id, headers, session):
     url = VOTE_URL
     # Payload with voteItemId and deviceId

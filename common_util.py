@@ -7,6 +7,7 @@ import csv
 import os
 import configparser
 import pyperclip
+import requests
 class IdolchampUtility:
     config = configparser.ConfigParser()
     config.read('config.ini')
@@ -119,13 +120,21 @@ class IdolchampUtility:
         except pyperclip.PyperclipException:
             print("Unable to copy text to clipboard. You can manually paste the text.")
             print(text)
-
+    @staticmethod
+    def send_message(URL, message):
+        url = URL
+        response = requests.post(url, data=message, headers={ 
+            
+            "Markdown": "yes",
+            "Tags": "chart_with_upwards_trend" 
+            })
+        return response.text
 
 if __name__ == "__main__":
-    user_agent = IdolchampUtility.generate_user_agent()
-    print(f"user_agent: {user_agent}\n")
-    headers = IdolchampUtility.generate_headers(user_agent)
-    print(f"headers: {headers}\n")
+    # user_agent = IdolchampUtility.generate_user_agent()
+    # print(f"user_agent: {user_agent}\n")
+    # headers = IdolchampUtility.generate_headers(user_agent)
+    # print(f"headers: {headers}\n")
     # headers_with_token = IdolchampUtility.generate_headers(user_agent, "1234567890")
     # print(f"headers_with_token: {headers_with_token}\n")
     # password = IdolchampUtility.generate_random_password()
@@ -133,3 +142,5 @@ if __name__ == "__main__":
     # IdolchampUtility.random_sleep(5, True)
     #proxy = IdolchampUtility.set_random_proxy()
     #print(f"Proxy: {proxy}")
+    message = "# updates \n_____\nStart Time: 00:01\nEnd Time: 00:35\nAccount Used: 1\n**Votes Casted: 500**"
+    IdolchampUtility.send_message("http://ec2-54-169-109-225.ap-southeast-1.compute.amazonaws.com:7777/tempest-8347820", message)
