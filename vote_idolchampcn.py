@@ -303,13 +303,20 @@ def checkVoteDetails(token, voteId, voteItemId, headers, session):
 def check_vote_item_id_in_list(response, voteItemId):
     # Extract the voteItemList from the response
     voteItemList = response.get('data', {}).get('voteItemList', [])
+    voteDetail = response.get('data', {}).get('voteDetail', {})
+
+    # Get love_count and ensure it's a valid integer
+    love_count = voteDetail.get('loveCount')
     
     # Loop through the voteItemList and check for record with specified voteItemId
     for item in voteItemList:
         if item.get('id') == voteItemId:
             name = item.get('titleSub')
             song = item.get('title')
-            logger.info(f"Vote Item Id {voteItemId} found: {name} - {song}")
+            score = item.get('score')
+            if love_count is not None and isinstance(love_count, int) and love_count!=0:
+                score = score / love_count
+            logger.info(f"Vote Item Id {voteItemId} found: {name} - {song} ({score} votes)")
             return True
             
     return False
