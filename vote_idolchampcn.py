@@ -315,7 +315,7 @@ def check_vote_item_id_in_list(response, voteItemId):
             song = item.get('title')
             score = item.get('score')
             if love_count is not None and isinstance(love_count, int) and love_count!=0:
-                score = score / love_count
+                score = score // love_count
             logger.info(f"Vote Item Id {voteItemId} found: {name} - {song} ({score} votes)")
             return True
             
