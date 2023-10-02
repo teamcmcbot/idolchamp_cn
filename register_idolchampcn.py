@@ -224,8 +224,9 @@ def main():
                     IdolchampUtility.random_sleep(DELAY_MAX, False)
                     get_idol_list(token, session)
                     copytext = f"{phone_code}\t{phone}\t{new_password}"
-                    pyperclip.copy(copytext)
-                    logger.info("Copied to clipboard.")
+                    #pyperclip.copy(copytext)
+                    IdolchampUtility.copy_to_clipboard(copytext)
+                    #logger.info("Copied to clipboard.")
                     # result = session.get(TEST_URL, timeout=(5, 5))
                     # logger.info(result.text)
                     # logger.info(f"Response time: {result.elapsed.total_seconds()} seconds")

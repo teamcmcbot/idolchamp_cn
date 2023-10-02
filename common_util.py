@@ -6,6 +6,7 @@ import time
 import csv
 import os
 import configparser
+import pyperclip
 class IdolchampUtility:
     config = configparser.ConfigParser()
     config.read('config.ini')
@@ -110,6 +111,15 @@ class IdolchampUtility:
         if show_delay:
             print(f"Waiting for {sleep_time} seconds.")
         time.sleep(sleep_time)
+    @staticmethod
+    def copy_to_clipboard(text):
+        try:
+            pyperclip.copy(text)
+            print("Text copied to clipboard successfully.")
+        except pyperclip.PyperclipException:
+            print("Unable to copy text to clipboard. You can manually paste the text.")
+            print(text)
+
 
 if __name__ == "__main__":
     user_agent = IdolchampUtility.generate_user_agent()

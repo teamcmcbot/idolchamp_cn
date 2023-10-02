@@ -18,3 +18,4 @@ __pycache__/
 
 # Ignore Visual Studio Code settings
 .vscode/
+notes.md
