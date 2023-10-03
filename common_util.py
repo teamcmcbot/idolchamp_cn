@@ -122,13 +122,19 @@ class IdolchampUtility:
             print(text)
     @staticmethod
     def send_message(URL, message):
-        url = URL
-        response = requests.post(url, data=message, headers={ 
-            
-            "Markdown": "yes",
-            "Tags": "chart_with_upwards_trend" 
-            })
-        return response.text
+        try:
+            response = requests.post(
+                URL,
+                data=message,
+                headers={
+                    "Markdown": "yes",
+                    "Tags": "chart_with_upwards_trend"
+                },
+                timeout=5
+            )
+            return response.text
+        except requests.exceptions.Timeout:
+            return "Error sending message: Request Timeout"
 
 if __name__ == "__main__":
     # user_agent = IdolchampUtility.generate_user_agent()
@@ -143,4 +149,4 @@ if __name__ == "__main__":
     #proxy = IdolchampUtility.set_random_proxy()
     #print(f"Proxy: {proxy}")
     message = "# updates \n_____\nStart Time: 00:01\nEnd Time: 00:35\nAccount Used: 1\n**Votes Casted: 500**"
-    IdolchampUtility.send_message("http://ec2-54-169-109-225.ap-southeast-1.compute.amazonaws.com:7777/tempest-8347820", message)
+    print(IdolchampUtility.send_message("http://ec2-54-169-109-225.ap-southeast-1.compute.amazonaws.com:7777/tempest-8347820", message))
