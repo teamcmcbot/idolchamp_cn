@@ -2,6 +2,15 @@ from dotenv import load_dotenv
 load_dotenv()
 from common_util import IdolchampUtility
 
+from enum import Enum, auto
+class QueryMode(Enum):
+    EQUAL = auto()
+    GREATER_THAN_EQUAL = auto()
+    LESS_THAN_EQUAL = auto()
+class VoteMode(Enum):
+    EXACT = auto()
+    MAX = auto()
+
 import os
 import requests
 import time
@@ -38,12 +47,19 @@ TEST_URL = config.get('settings', 'TEST_URL')
 # Vote Config
 total_votes = config.getint('settings', 'total_votes')
 votes_per_account = config.getint('settings', 'votes_per_account')
+votes_to_query = config.getint('settings', 'votes_to_query')
 vote_id = config.getint('settings', 'vote_id')
 vote_item_id = config.getint('settings', 'vote_item_id')
 SHOWCHAMPION_HEARTS_PER_VOTE = config.getint('settings', 'SHOWCHAMPION_HEARTS_PER_VOTE')
 total_time = 0
 account_time = 0
 account_vote_count = 0
+# Get the query mode from the configuration
+query_mode_str = config.get('settings', 'QUERY_MODE')
+query_mode_enum = QueryMode[query_mode_str]
+# Get the vote mode from the configuration
+vote_mode_str = config.get('settings', 'VOTE_MODE')
+vote_mode_enum = VoteMode[vote_mode_str]
 
 # NTFY Config
 NTFY_HOST=config.get('settings', 'NTFY_HOST')
@@ -73,12 +89,18 @@ def lambda_handler(event, context):
         supabase.table(IDC_TABLE)
         .select(IDC_SELECT)
     )
-    if votes_per_account:
-        query.gte(IDC_COL_VOTES_LEFT, votes_per_account)
+    # Use the corresponding query method based on QUERY_MODE
+    if votes_to_query:
+        if query_mode_enum == QueryMode.EQUAL:
+            query.eq(IDC_COL_VOTES_LEFT, votes_to_query)
+        elif query_mode_enum == QueryMode.GREATER_THAN_EQUAL:
+            query.gte(IDC_COL_VOTES_LEFT, votes_to_query)
+        elif query_mode_enum == QueryMode.LESS_THAN_EQUAL:
+            query.lte(IDC_COL_VOTES_LEFT, votes_to_query)
     query.order(IDC_COL_VOTES_LEFT, desc=True)
     query.order(IDC_COL_LAST_UPDATE, desc=False)
     response = query.execute()
-    logger.info(f"Found {len(response.data)} accounts with {votes_per_account} or more votes left")
+    logger.info(f"Found {len(response.data)} accounts with {query_mode_str} {votes_to_query} votes")
     logger.info(f"Target: {total_votes} votes.")
     start_time = datetime.now()
     for row in response.data:
@@ -122,7 +144,6 @@ def lambda_handler(event, context):
                 continue
             logger.info(f"Voting in progress: {total_votes_casted} / {total_votes}")
             for i in range(vote_amount):
-                
                 # Call function to cast vote
                 vote_success = cast_vote(token, vote_item_id, device_id, headers, session)
                 if not vote_success:
@@ -160,7 +181,7 @@ def lambda_handler(event, context):
         NTFY_URL = f"{NTFY_HOST}{NTFY_TOPIC}"
         message = f"# updates \n_____\n*{start_time.strftime('%Y-%m-%d %H:%M:%S')}* to *{end_time.strftime('%Y-%m-%d %H:%M:%S')}*\nAccounts used: {total_accounts}\n**Votes Casted: {total_votes_casted}**"
         #logger.info(f"Sending message to {NTFY_URL}: {message}")
-        IdolchampUtility.send_message(NTFY_URL, message)
+        logger.info(IdolchampUtility.send_message(NTFY_URL, message))
     return json_response
 def cast_vote(token, vote_item_id, device_id, headers, session):
     url = VOTE_URL
@@ -182,10 +203,8 @@ def cast_vote(token, vote_item_id, device_id, headers, session):
             account_time += vote_response.elapsed.total_seconds()
             global account_vote_count
             account_vote_count += 1
-
             IdolchampUtility.random_sleep(VOTE_DELAY_MAX, False)
             return True
-        
         except requests.Timeout:
             logger.info(f"Timeout error while casting vote using token: {token}")
         except requests.HTTPError as e:
@@ -198,7 +217,6 @@ def cast_vote(token, vote_item_id, device_id, headers, session):
             logger.info(f"HTTP Error {e} occurred while casting vote using token: {token}")
         except requests.RequestException as e:
             logger.info(f"Error {e} occurred while casting vote using token: {token}")
-
         # If this isn't the last attempt, sleep before trying again
         if attempt < MAX_RETRIES - 1:
             time.sleep(DELAY_BETWEEN_RETRIES)
@@ -207,7 +225,7 @@ def cast_vote(token, vote_item_id, device_id, headers, session):
 def update_account(id, token, votes_casted, headers, session):
     blue_hearts_after = checkAccount(token, headers, session)
     if blue_hearts_after is not None:
-        #logger.info(f"Blue Hearts after voting: {blue_hearts_after}")
+        logger.info(f"Blue Hearts after voting: {blue_hearts_after}")
         votes_left_after = blue_hearts_after//SHOWCHAMPION_HEARTS_PER_VOTE
         max_votes_left_after = 100 if votes_left_after > 100 else votes_left_after
         logger.info(f"Updating account id: {id}, votes casted: {votes_casted}, votes left: {votes_left_after}")
@@ -354,7 +372,7 @@ def verify_vote_details(vote_details):
 def get_max_vote_amount(vote_remaining, love_count, blue_hearts, total_votes, total_votes_casted):
     amount_to_vote = 0 
     votes_left = total_votes - total_votes_casted
-    logger.info(f"total_votes: {total_votes}, total_votes_casted: {total_votes_casted}, votes_left: {votes_left}")
+    logger.info(f"total_votes: {total_votes}, total_votes_casted: {total_votes_casted}, votes_left: {votes_left}, blue_hearts: {blue_hearts}")
     if love_count == 0:
         return vote_remaining # doesnt cost hearts to vote.
     account_max_votes = blue_hearts // love_count
@@ -364,6 +382,9 @@ def get_max_vote_amount(vote_remaining, love_count, blue_hearts, total_votes, to
     if amount_to_vote > votes_left:
         amount_to_vote = votes_left
     logger.info(f"account_max_votes: {account_max_votes}, vote_remaining: {vote_remaining}, amount_to_vote: {amount_to_vote}")
+    if vote_mode_enum == VoteMode.EXACT and amount_to_vote > votes_per_account:
+        amount_to_vote = votes_per_account
+        logger.info(f"EXACT mode, overriding votes amount: {amount_to_vote}")
     return amount_to_vote 
 if __name__ == "__main__":
     test_event = {
