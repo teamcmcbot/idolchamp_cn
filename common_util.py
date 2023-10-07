@@ -8,6 +8,7 @@ import os
 import configparser
 import pyperclip
 import requests
+import logging
 class IdolchampUtility:
     config = configparser.ConfigParser()
     config.read('config.ini')
@@ -19,6 +20,7 @@ class IdolchampUtility:
     data_file = "data.csv"
     ORIGIN = config.get('settings', 'ORIGIN')
     REFERER = config.get('settings', 'REFERER')
+    pushover_url = config.get('settings', 'PUSHOVER_URL')
     
     @staticmethod
     def initialize():
@@ -108,9 +110,10 @@ class IdolchampUtility:
         return password
     @staticmethod
     def random_sleep(max_delay, show_delay):
+        logger = logging.getLogger(__name__)
         sleep_time = round(random.uniform(0, max_delay), 2)  # Generates a random float and rounds it to 2 decimal places
         if show_delay:
-            print(f"Waiting for {sleep_time} seconds.")
+            logger.info(f"Waiting for {sleep_time} seconds.")
         time.sleep(sleep_time)
     @staticmethod
     def copy_to_clipboard(text):
@@ -135,8 +138,33 @@ class IdolchampUtility:
             return response.text
         except requests.exceptions.Timeout:
             return "Error sending message: Request Timeout"
-
+    @staticmethod
+    def send_push(message, title=None):
+        URL = IdolchampUtility.pushover_url
+        print(f"URL: {URL}")
+        try:
+            response = requests.post(
+                URL,
+                json={ 
+                    "title" : title, 
+                    "message": message 
+                },
+                headers={
+                    "Content-Type": "application/json"
+                },
+                timeout=30
+            )
+            return response.text
+        except requests.exceptions.Timeout:
+            return "Error sending message: Request Timeout"
+        
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger()
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    file_handler = logging.FileHandler('common_util.log')
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
     # user_agent = IdolchampUtility.generate_user_agent()
     # print(f"user_agent: {user_agent}\n")
     # headers = IdolchampUtility.generate_headers(user_agent)
@@ -148,5 +176,9 @@ if __name__ == "__main__":
     # IdolchampUtility.random_sleep(5, True)
     #proxy = IdolchampUtility.set_random_proxy()
     #print(f"Proxy: {proxy}")
-    message = "# updates \n_____\nStart Time: 00:01\nEnd Time: 00:35\nAccount Used: 1\n**Votes Casted: 500**"
-    print(IdolchampUtility.send_message("http://ec2-54-169-109-225.ap-southeast-1.compute.amazonaws.com:7777/tempest-8347820", message))
+    #message = "# updates \n_____\nStart Time: 00:01\nEnd Time: 00:35\nAccount Used: 1\n**Votes Casted: 500**"
+    #print(IdolchampUtility.send_push("", message))
+    #message = "An error has occured 2"
+    #title = "Error Occurred 2"
+    #print(IdolchampUtility.notify_error(message, title))
+    IdolchampUtility.random_sleep(5, True)

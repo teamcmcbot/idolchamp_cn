@@ -43,6 +43,7 @@ VOTE_DETAIL_URL = config.get('settings', 'VOTE_DETAIL_URL')
 VOTE_URL = config.get('settings', 'VOTE_URL')
 MY_URL = config.get('settings', 'MY_URL')
 TEST_URL = config.get('settings', 'TEST_URL')
+UPDATE_PROGRESS = config.get('settings', 'UPDATE_PROGRESS')
 
 # Vote Config
 total_votes = config.getint('settings', 'total_votes')
@@ -54,6 +55,7 @@ SHOWCHAMPION_HEARTS_PER_VOTE = config.getint('settings', 'SHOWCHAMPION_HEARTS_PE
 total_time = 0
 account_time = 0
 account_vote_count = 0
+error504_count = 0
 # Get the query mode from the configuration
 query_mode_str = config.get('settings', 'QUERY_MODE')
 query_mode_enum = QueryMode[query_mode_str]
@@ -64,6 +66,7 @@ vote_mode_enum = VoteMode[vote_mode_str]
 # NTFY Config
 NTFY_HOST=config.get('settings', 'NTFY_HOST')
 NTFY_TOPIC=config.get('settings', 'NTFY_TOPIC')
+NTFY_URL = f"{NTFY_HOST}{NTFY_TOPIC}"
 
 # DB Config
 IDC_TABLE = config.get('settings', 'IDC_TABLE')
@@ -130,7 +133,7 @@ def lambda_handler(event, context):
             love_count = 0
             vote_details = checkVoteDetails(token, vote_id, vote_item_id, headers, session)
             if not verify_vote_details(vote_details):
-                if vote_details["state"]!=2:
+                if vote_details["state"]!=2 and vote_details["state"]!=0:
                     break
                 continue
             love_count = vote_details["love_count"]
@@ -159,8 +162,14 @@ def lambda_handler(event, context):
                 update_account(account_id,token,votes_casted, headers, session)
                 total_accounts += 1
                 total_votes_casted += votes_casted
+                if(total_accounts % UPDATE_PROGRESS == 0):
+                    message = f"Current Progress: {total_votes_casted} / {total_votes}"
+                    if NTFY_HOST and NTFY_TOPIC:
+                        IdolchampUtility.send_message(NTFY_URL, message)
+                    IdolchampUtility.send_push(message, "Voting Updates")
                 if total_votes_casted >= total_votes:
                     break
+
             IdolchampUtility.random_sleep(ACCOUNT_SWITCH_DELAY, True)
     # End of for loop of accounts
     logger.info(f"Voting completed! Total Votes Casted: {total_votes_casted}, Accounts used: {total_accounts}")
@@ -178,10 +187,11 @@ def lambda_handler(event, context):
         "end_time": end_time.strftime('%Y-%m-%d %H:%M:%S')  # Format the datetime as a string
     }
     if NTFY_HOST and NTFY_TOPIC:
-        NTFY_URL = f"{NTFY_HOST}{NTFY_TOPIC}"
+        #NTFY_URL = f"{NTFY_HOST}{NTFY_TOPIC}"
         message = f"# updates \n_____\n*{start_time.strftime('%Y-%m-%d %H:%M:%S')}* to *{end_time.strftime('%Y-%m-%d %H:%M:%S')}*\nAccounts used: {total_accounts}\n**Votes Casted: {total_votes_casted}**"
         #logger.info(f"Sending message to {NTFY_URL}: {message}")
         logger.info(IdolchampUtility.send_message(NTFY_URL, message))
+    IdolchampUtility.send_push(json_response, "Voting Completed")    
     return json_response
 def cast_vote(token, vote_item_id, device_id, headers, session):
     url = VOTE_URL
@@ -206,17 +216,17 @@ def cast_vote(token, vote_item_id, device_id, headers, session):
             IdolchampUtility.random_sleep(VOTE_DELAY_MAX, False)
             return True
         except requests.Timeout:
-            logger.info(f"Timeout error while casting vote using token: {token}")
+            logger.error(f"Timeout error while casting vote using token: {token}")
         except requests.HTTPError as e:
             if vote_response.status_code == 504:
                 global error504_count
                 error504_count += 1
-                logger.info(f"Received a 504 error. Count: {error504_count}")
+                logger.error(f"Received a 504 error. Count: {error504_count}")
                 if error504_count >= 10:
                     return False
-            logger.info(f"HTTP Error {e} occurred while casting vote using token: {token}")
+            logger.error(f"HTTP Error {e} occurred while casting vote using token: {token}")
         except requests.RequestException as e:
-            logger.info(f"Error {e} occurred while casting vote using token: {token}")
+            logger.error(f"Error {e} occurred while casting vote using token: {token}")
         # If this isn't the last attempt, sleep before trying again
         if attempt < MAX_RETRIES - 1:
             time.sleep(DELAY_BETWEEN_RETRIES)
@@ -381,10 +391,10 @@ def get_max_vote_amount(vote_remaining, love_count, blue_hearts, total_votes, to
         amount_to_vote =  vote_remaining
     if amount_to_vote > votes_left:
         amount_to_vote = votes_left
-    logger.info(f"account_max_votes: {account_max_votes}, vote_remaining: {vote_remaining}, amount_to_vote: {amount_to_vote}")
     if vote_mode_enum == VoteMode.EXACT and amount_to_vote > votes_per_account:
         amount_to_vote = votes_per_account
-        logger.info(f"EXACT mode, overriding votes amount: {amount_to_vote}")
+        # logger.info(f"EXACT mode, overriding votes amount: {amount_to_vote}")
+    logger.info(f"account_max_votes: {account_max_votes}, vote_remaining: {vote_remaining}, amount_to_vote: {amount_to_vote}")
     return amount_to_vote 
 if __name__ == "__main__":
     test_event = {
