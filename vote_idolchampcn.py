@@ -43,7 +43,7 @@ VOTE_DETAIL_URL = config.get('settings', 'VOTE_DETAIL_URL')
 VOTE_URL = config.get('settings', 'VOTE_URL')
 MY_URL = config.get('settings', 'MY_URL')
 TEST_URL = config.get('settings', 'TEST_URL')
-UPDATE_PROGRESS = config.get('settings', 'UPDATE_PROGRESS')
+UPDATE_PROGRESS = config.getint('settings', 'UPDATE_PROGRESS')
 
 # Vote Config
 total_votes = config.getint('settings', 'total_votes')
