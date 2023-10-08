@@ -16,11 +16,14 @@ class IdolchampUtility:
     proxy_list = []
     proxy_username = os.environ.get("PROXY_USERNAME")
     proxy_password = os.environ.get("PROXY_PASSWORD")
+    proxy_resident_username = os.environ.get("PROXY_RESIDENT_USERNAME")
+    proxy_resident_password = os.environ.get("PROXY_RESIDENT_PASSWORD")
     # Define the path to your data.csv file
     data_file = "data.csv"
     ORIGIN = config.get('settings', 'ORIGIN')
     REFERER = config.get('settings', 'REFERER')
     pushover_url = config.get('settings', 'PUSHOVER_URL')
+    TEST_URL = config.get('settings', 'TEST_URL')
     
     @staticmethod
     def initialize():
@@ -30,12 +33,21 @@ class IdolchampUtility:
         with open(IdolchampUtility.data_file, mode='r') as file:
             csv_reader = csv.reader(file, delimiter=':')
             for row in csv_reader:
+                host = row[0]
+                port = row[1]
+                # Set password based on the host prefix
+                if host.startswith("dc."):
+                    username = IdolchampUtility.proxy_username
+                    password = IdolchampUtility.proxy_password
+                else:
+                    username = IdolchampUtility.proxy_resident_username
+                    password = IdolchampUtility.proxy_resident_password
                 if len(row) == 2:  # Ensure each row has four elements
                     IdolchampUtility.proxy_list.append({
-                        'host': row[0],
-                        'port': row[1],
-                        'username': IdolchampUtility.proxy_username,
-                        'password': IdolchampUtility.proxy_password
+                        'host': host,
+                        'port': port,
+                        'username': username,
+                        'password': password
                     })
 
     @staticmethod
@@ -157,7 +169,19 @@ class IdolchampUtility:
             return response.text
         except requests.exceptions.Timeout:
             return "Error sending message: Request Timeout"
-        
+    @staticmethod
+    def test_proxy(proxies):
+        with requests.Session() as session:
+            session.proxies = proxies
+            result = session.get(IdolchampUtility.TEST_URL)
+            logger.info(result.text)  
+            print(f"Reponse time: {result.elapsed.total_seconds()}")  
+            result = session.get(IdolchampUtility.TEST_URL)
+            logger.info(result.text)  
+            print(f"Reponse time: {result.elapsed.total_seconds()}")  
+            result = session.get(IdolchampUtility.TEST_URL)
+            logger.info(result.text)  
+            print(f"Reponse time: {result.elapsed.total_seconds()}")  
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger()
@@ -174,11 +198,12 @@ if __name__ == "__main__":
     # password = IdolchampUtility.generate_random_password()
     # print(f"Password: {password}")
     # IdolchampUtility.random_sleep(5, True)
-    #proxy = IdolchampUtility.set_random_proxy()
-    #print(f"Proxy: {proxy}")
+    proxy = IdolchampUtility.set_random_proxy()
+    print(f"Proxy: {proxy}")
+    IdolchampUtility.test_proxy(proxy)
     #message = "# updates \n_____\nStart Time: 00:01\nEnd Time: 00:35\nAccount Used: 1\n**Votes Casted: 500**"
     #print(IdolchampUtility.send_push("", message))
     #message = "An error has occured 2"
     #title = "Error Occurred 2"
     #print(IdolchampUtility.notify_error(message, title))
-    IdolchampUtility.random_sleep(5, True)
+    #IdolchampUtility.random_sleep(5, True)
