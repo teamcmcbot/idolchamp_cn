@@ -203,7 +203,7 @@ def cast_vote(token, vote_item_id, device_id, headers, session):
     }
     for attempt in range(MAX_RETRIES):
         try:
-            vote_response = session.post(url, json=data, headers=headers, timeout=60)  # Send data as JSON
+            vote_response = session.post(url, json=data, headers=headers, timeout=TIMEOUT_POST)  # Send data as JSON
             vote_response.raise_for_status()  # Will raise an exception for HTTP error responses
             # Print the response time in seconds
             #logger.info(f"Response time: {vote_response.elapsed.total_seconds()} seconds")
