@@ -77,6 +77,7 @@ IDC_COL_MAX_VOTES = config.get('settings', 'IDC_COL_MAX_VOTES')
 IDC_COL_BLUE_HEART = config.get('settings', 'IDC_COL_BLUE_HEART')
 IDC_COL_ID = config.get('settings', 'IDC_COL_ID')
 IDC_COL_TOKEN = config.get('settings', 'IDC_COL_TOKEN')
+IDC_COL_PASSWORD = config.get('settings', 'IDC_COL_PASSWORD')
 
 from supabase import create_client, Client
 url = os.environ.get("SUPABASE_URL")
@@ -128,6 +129,8 @@ def lambda_handler(event, context):
             # Set the proxies for the session
             if USE_PROXY:
                 session.proxies = proxies
+                # Disable SSL certificate verification for the session
+                session.verify = False
             result = session.get(TEST_URL)
             logger.info(result.text)
             love_count = 0

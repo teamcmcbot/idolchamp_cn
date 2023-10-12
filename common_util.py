@@ -181,7 +181,13 @@ class IdolchampUtility:
             print(f"Reponse time: {result.elapsed.total_seconds()}")  
             result = session.get(IdolchampUtility.TEST_URL)
             logger.info(result.text)  
-            print(f"Reponse time: {result.elapsed.total_seconds()}")  
+            print(f"Reponse time: {result.elapsed.total_seconds()}")
+    @staticmethod
+    def generate_device_id():
+        epoch = int(time.time() * 1000)  # Convert time to milliseconds, similar to JavaScript's getTime()
+        device_id = f"device-{epoch}"
+        #logger.info(f"deviceId: {device_id}")
+        return device_id  
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger()
