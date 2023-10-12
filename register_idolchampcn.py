@@ -40,6 +40,7 @@ MY_URL = config.get('settings', 'MY_URL')
 ATTENDANCE_URL = config.get('settings', 'ATTENDANCE_URL')
 VOTE_LIST_URL = config.get('settings', 'VOTE_LIST_URL')
 COMMENT_URL = config.get('settings', 'COMMENT_URL')
+MAX_RETRIES = config.getint('settings', 'MAX_RETRIES')
 
 def generate_otp(phone_code, phone, session, HEADERS_WITHOUT_TOKEN):
     url = OTP_URL
@@ -49,19 +50,27 @@ def generate_otp(phone_code, phone, session, HEADERS_WITHOUT_TOKEN):
         "position": 1
     }
 
-    response = session.post(url, headers=HEADERS_WITHOUT_TOKEN, data=json.dumps(data))
-    response_json = response.json()
+    for _ in range(MAX_RETRIES):
+        try:
+            response = session.post(url, headers=HEADERS_WITHOUT_TOKEN, data=json.dumps(data))
+            response_json = response.json()
 
-    if response.status_code == 200:
-        if "isExistPhone" in response_json.get("data", {}):
-            phoneExist = response_json["data"]["isExistPhone"]
-            logger.info(f"OTP generated successfully. Exist: {phoneExist}") 
-        else:
-            logger.info("OTP generated successfully.")
-        return True
-    else:
-        logger.info(f"Error generating OTP. Status code: {response.status_code}")
-        return False
+            if response.status_code == 200:
+                if "isExistPhone" in response_json.get("data", {}):
+                    phoneExist = response_json["data"]["isExistPhone"]
+                    logger.info(f"OTP generated successfully. Exist: {phoneExist}") 
+                else:
+                    logger.info("OTP generated successfully.")
+                return True
+            else:
+                logger.warning(f"Error generating OTP. Status code: {response.status_code}")
+                return False
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Request failed due to: {e}. Retrying...")
+
+    logger.error("Max retries exceeded. Failed to generate OTP.")
+    return False
 
 def login_with_otp(phone_code, phone, otp, session, HEADERS_WITHOUT_TOKEN):
     url = LOGIN_URL
@@ -72,17 +81,23 @@ def login_with_otp(phone_code, phone, otp, session, HEADERS_WITHOUT_TOKEN):
         "position": 1,
         "device": "ANDROID"
     }
+    for _ in range(MAX_RETRIES):
+        try:
+            response = session.post(url, headers=HEADERS_WITHOUT_TOKEN, data=json.dumps(data))
+            response_json = response.json()
 
-    response = session.post(url, headers=HEADERS_WITHOUT_TOKEN, data=json.dumps(data))
-    response_json = response.json()
-
-    if response.status_code == 200:
-        if "token" in response_json.get("data", {}):
-            return response_json["data"]  # Return data if it contains a token
-        else:
-            logger.info("Login successful, but token not found in response.")
-    else:
-        logger.info(f"Login failed. Status code: {response.status_code}")
+            if response.status_code == 200:
+                if "token" in response_json.get("data", {}):
+                    return response_json["data"]  # Return data if it contains a token
+                else:
+                    logger.info("Login successful, but token not found in response.")
+                    return None
+            else:
+                logger.info(f"Login failed. Status code: {response.status_code}")
+                return None
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Request failed due to: {e}. Retrying...")
+    logger.error("Max retries exceeded. Failed to generate OTP.")
     return None
 
 def change_password(token, new_password, session, HEADERS_WITH_TOKEN):
@@ -90,73 +105,102 @@ def change_password(token, new_password, session, HEADERS_WITH_TOKEN):
     data = {
         "password": new_password
     }
+    for _ in range(MAX_RETRIES):
+        try:
+            response = session.post(url, headers=HEADERS_WITH_TOKEN, data=json.dumps(data))
+            response_json = response.json()
 
-    response = session.post(url, headers=HEADERS_WITH_TOKEN, data=json.dumps(data))
-    response_json = response.json()
-
-    if response.status_code == 200:
-        logger.info(f"Password change successful. [{new_password}]")
-    else:
-        logger.info(f"Password change failed. Status code: {response.status_code}")
-
+            if response.status_code == 200:
+                logger.info(f"Password change successful. [{new_password}]")
+                return True
+            else:
+                logger.info(f"Password change failed. Status code: {response.status_code}")
+                return False
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Request failed due to: {e}. Retrying...")
+    return False
 def get_idol_list(token, session, HEADERS_WITH_TOKEN):
     url = GET_IDOL_URL
-    
-    response = session.get(url, headers=HEADERS_WITH_TOKEN)
-    response_json = response.json()
-    
-    if response.status_code == 200:
-        idol_list = response_json.get("data", {}).get("idolList", [])
-        if idol_list:
-            random_idol = random.choice(idol_list)
-            idol_id = random_idol.get("id")
-            name_en = random_idol.get("nameEn")
-            logger.info(f"Random Idol: ID - {idol_id}, NameEn - {name_en}")
-            IdolchampUtility.random_sleep(DELAY_MAX, False)
-            set_idol(token, idol_id, session, HEADERS_WITH_TOKEN)
-        else:
-            logger.info("No idols found in the response.")
-    else:
-        logger.info(f"Failed to retrieve idol list. Status code: {response.status_code}")
+    for _ in range(MAX_RETRIES):
+        try:
+            response = session.get(url, headers=HEADERS_WITH_TOKEN)
+            response_json = response.json()
+            
+            if response.status_code == 200:
+                idol_list = response_json.get("data", {}).get("idolList", [])
+                if idol_list:
+                    random_idol = random.choice(idol_list)
+                    idol_id = random_idol.get("id")
+                    name_en = random_idol.get("nameEn")
+                    logger.info(f"Random Idol: ID - {idol_id}, NameEn - {name_en}")
+                    IdolchampUtility.random_sleep(DELAY_MAX, False)
+                    return set_idol(token, idol_id, session, HEADERS_WITH_TOKEN)
+                else:
+                    logger.info("No idols found in the response.")
+                    return False
+            else:
+                logger.info(f"Failed to retrieve idol list. Status code: {response.status_code}")
+                return False
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Request failed due to: {e}. Retrying...")
+    return False
 
 def set_idol(token, idol_id, session, HEADERS_WITH_TOKEN):
     url = SET_IDOL_URL
     data = {
         "list": [idol_id]
     }
+    for _ in range(MAX_RETRIES):
+        try:
+            response = session.post(url, headers=HEADERS_WITH_TOKEN, data=json.dumps(data))
+            response_json = response.json()
 
-    response = session.post(url, headers=HEADERS_WITH_TOKEN, data=json.dumps(data))
-    response_json = response.json()
-
-    if response.status_code == 200:
-        logger.info(f"Idol with ID {idol_id} set successfully.")
-        IdolchampUtility.random_sleep(DELAY_MAX, False)
-        view_idol(idol_id,token, session, HEADERS_WITH_TOKEN)
-    else:
-        logger.info(f"Failed to set idol with ID {idol_id}. Status code: {response.status_code}")
+            if response.status_code == 200:
+                logger.info(f"Idol with ID {idol_id} set successfully.")
+                IdolchampUtility.random_sleep(DELAY_MAX, False)
+                return view_idol(idol_id,token, session, HEADERS_WITH_TOKEN)
+            else:
+                logger.info(f"Failed to set idol with ID {idol_id}. Status code: {response.status_code}")
+                return False
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Request failed due to: {e}. Retrying...")
+    return False
 
 def view_idol(idol_id, token, session, HEADERS_WITH_TOKEN):
     url = VIEW_IDOL_URL + str(idol_id)
-    
-    response = session.get(url, headers=HEADERS_WITH_TOKEN)
-    response_json = response.json()
-    
-    if response.status_code == 200:
-        logger.info(f"Viewing idol: {idol_id}")
-        IdolchampUtility.random_sleep(DELAY_MAX, False)
-        complete_registration(token, session, HEADERS_WITH_TOKEN)
-    else:
-        logger.info(f"Failed to view idol. Status code: {response.status_code}")
+    for _ in range(MAX_RETRIES):
+        try:
+            response = session.get(url, headers=HEADERS_WITH_TOKEN)
+            response_json = response.json()
+            
+            if response.status_code == 200:
+                logger.info(f"Viewing idol: {idol_id}")
+                IdolchampUtility.random_sleep(DELAY_MAX, False)
+                return complete_registration(token, session, HEADERS_WITH_TOKEN)
+            else:
+                logger.info(f"Failed to view idol. Status code: {response.status_code}")
+                return False
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Request failed due to: {e}. Retrying...")
+    return False
+
 def complete_registration(token, session, HEADERS_WITH_TOKEN):
     url = PARAM_URL
-    
-    response = session.get(url, headers=HEADERS_WITH_TOKEN)
-    response_json = response.json()
-    
-    if response.status_code == 200:
-        logger.info("Account registered: "+token)
-    else:
-        logger.info(f"Failed to proceed. Status code: {response.status_code}")
+    for _ in range(MAX_RETRIES):
+        try:
+            response = session.get(url, headers=HEADERS_WITH_TOKEN)
+            response_json = response.json()
+            
+            if response.status_code == 200:
+                logger.info("Account registered: "+token)
+                return True
+            else:
+                logger.info(f"Failed to proceed. Status code: {response.status_code}")
+                return False
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Request failed due to: {e}. Retrying...")
+    return False
+
 def login_with_password(phone_code, phone, password, session, HEADERS_WITHOUT_TOKEN):
     url = PASSWORD_LOGIN_URL
     data = {
@@ -165,53 +209,77 @@ def login_with_password(phone_code, phone, password, session, HEADERS_WITHOUT_TO
         "password": password,
         "device": "ANDROID"
     }
-    response = session.post(url, headers=HEADERS_WITHOUT_TOKEN, data=json.dumps(data))
-    response_json = response.json()
+    for _ in range(MAX_RETRIES):
+        try:
+            response = session.post(url, headers=HEADERS_WITHOUT_TOKEN, data=json.dumps(data))
+            response_json = response.json()
 
-    if response.status_code == 200:
-        if "token" in response_json.get("data", {}):
-            return response_json["data"]  # Return data if it contains a token
-        else:
-            logger.info("Login successful, but token not found in response.")
-    else:
-        logger.info(f"Login failed. Status code: {response.status_code}")
+            if response.status_code == 200:
+                if "token" in response_json.get("data", {}):
+                    return response_json["data"]  # Return data if it contains a token
+                else:
+                    logger.info("Login successful, but token not found in response.")
+                    return None
+            else:
+                logger.info(f"Login failed. Status code: {response.status_code}")
+                return None
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Request failed due to: {e}. Retrying...")
     return None
 def get_my(session, HEADERS_WITH_TOKEN):
     url = MY_URL
-    response = session.get(url, headers=HEADERS_WITH_TOKEN)
-    response_json = response.json()
+    for _ in range(MAX_RETRIES):
+        try:
+            response = session.get(url, headers=HEADERS_WITH_TOKEN)
+            response_json = response.json()
 
-    if response.status_code == 200:
-        if "loveTimeNum" in response_json.get("data", {}):
-            return response_json["data"]  # Return data if it contains a token
-        else:
-            logger.info("Login successful, but loveTimeNum not found in response.")
-    else:
-        logger.info(f"Login failed. Status code: {response.status_code}")
+            if response.status_code == 200:
+                if "loveTimeNum" in response_json.get("data", {}):
+                    return response_json["data"]  # Return data if it contains a token
+                else:
+                    logger.info("Login successful, but loveTimeNum not found in response.")
+                    return None
+            else:
+                logger.info(f"Login failed. Status code: {response.status_code}")
+                return None
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Request failed due to: {e}. Retrying...")
     return None
 def get_attendance(device_id, session, HEADERS_WITH_TOKEN):
     url = f"{ATTENDANCE_URL}{device_id}"
-    response = session.get(url, headers=HEADERS_WITH_TOKEN)
-    response_json = response.json()
-    if response.status_code == 200:
-        if "loveTimeNum" in response_json.get("data", {}):
-            return response_json["data"]  # Return data if it contains a token
-        else:
-            logger.info("Attendance successful, but loveTimeNum not found in response.")
-    else:
-        logger.info(f"Attendance failed. Status code: {response.status_code}")
+    for _ in range(MAX_RETRIES):
+        try:
+            response = session.get(url, headers=HEADERS_WITH_TOKEN)
+            response_json = response.json()
+            if response.status_code == 200:
+                if "loveTimeNum" in response_json.get("data", {}):
+                    return response_json["data"]  # Return data if it contains a token
+                else:
+                    logger.info("Attendance successful, but loveTimeNum not found in response.")
+                    return None
+            else:
+                logger.info(f"Attendance failed. Status code: {response.status_code}")
+                return None
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Request failed due to: {e}. Retrying...")
     return None
 def get_vote_list(session, HEADERS_WITH_TOKEN):
     url = VOTE_LIST_URL
-    response = session.get(url, headers=HEADERS_WITH_TOKEN)
-    response_json = response.json()
-    if response.status_code == 200:
-        if "voteList" in response_json.get("data", {}):
-            return response_json["data"]["voteList"]  # Return data if it contains a token
-        else:
-            logger.info("Call successful, but voteList not found in response.")
-    else:
-        logger.info(f"Call failed. Status code: {response.status_code}")
+    for _ in range(MAX_RETRIES):
+        try:
+            response = session.get(url, headers=HEADERS_WITH_TOKEN)
+            response_json = response.json()
+            if response.status_code == 200:
+                if "voteList" in response_json.get("data", {}):
+                    return response_json["data"]["voteList"]  # Return data if it contains a token
+                else:
+                    logger.info("Call successful, but voteList not found in response.")
+                    return None
+            else:
+                logger.info(f"Call failed. Status code: {response.status_code}")
+                return None
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Request failed due to: {e}. Retrying...")
     return None
 def post_comment(vote_id, session, HEADERS_WITH_TOKEN):
     url = COMMENT_URL
@@ -223,17 +291,23 @@ def post_comment(vote_id, session, HEADERS_WITH_TOKEN):
         "device": "ANDROID",
         "imageUrl": ""
     }
-    response = session.post(url, headers=HEADERS_WITH_TOKEN, data=json.dumps(data))
-    response_json = response.json()
+    for _ in range(MAX_RETRIES):
+        try:
+            response = session.post(url, headers=HEADERS_WITH_TOKEN, data=json.dumps(data))
+            response_json = response.json()
 
-    if response.status_code == 200:
-        if "comment" in response_json.get("data", {}):
-            logger.info("Comment successful.")
-            return response_json["data"]  # Return data if it contains a comment
-        else:
-            logger.info("Comment successful, but comment not found in response.")
-    else:
-        logger.info(f"Comment failed. Status code: {response.status_code}")
+            if response.status_code == 200:
+                if "comment" in response_json.get("data", {}):
+                    logger.info("Comment successful.")
+                    return response_json["data"]  # Return data if it contains a comment
+                else:
+                    logger.info("Comment successful, but comment not found in response.")
+                    return None
+            else:
+                logger.info(f"Comment failed. Status code: {response.status_code}")
+                return None
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Request failed due to: {e}. Retrying...")
     return None
 def main():
     USER_AGENT = IdolchampUtility.generate_user_agent()
