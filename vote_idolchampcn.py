@@ -130,7 +130,7 @@ def lambda_handler(event, context):
             if USE_PROXY:
                 session.proxies = proxies
                 # Disable SSL certificate verification for the session
-                session.verify = False
+                # session.verify = False
             result = session.get(TEST_URL)
             logger.info(result.text)
             love_count = 0
@@ -172,7 +172,9 @@ def lambda_handler(event, context):
                     IdolchampUtility.send_push(message, "Voting Updates")
                 if total_votes_casted >= total_votes:
                     break
-
+            if error504_count >=10 :
+                logger.info(f"Too many 504: {error504_count}") 
+                break;
             IdolchampUtility.random_sleep(ACCOUNT_SWITCH_DELAY, True)
     # End of for loop of accounts
     logger.info(f"Voting completed! Total Votes Casted: {total_votes_casted}, Accounts used: {total_accounts}")
@@ -219,7 +221,7 @@ def cast_vote(token, vote_item_id, device_id, headers, session):
             IdolchampUtility.random_sleep(VOTE_DELAY_MAX, False)
             return True
         except requests.Timeout:
-            logger.error(f"Timeout error while casting vote using token: {token}")
+            logger.error(f"Timeout error while casting vote using token: {token}. Retry attempt: {attempt + 1}")
         except requests.HTTPError as e:
             if vote_response.status_code == 504:
                 global error504_count
@@ -227,9 +229,9 @@ def cast_vote(token, vote_item_id, device_id, headers, session):
                 logger.error(f"Received a 504 error. Count: {error504_count}")
                 if error504_count >= 10:
                     return False
-            logger.error(f"HTTP Error {e} occurred while casting vote using token: {token}")
+            logger.error(f"HTTP Error {e} occurred while casting vote using token: {token}. Retry attempt: {attempt + 1}")
         except requests.RequestException as e:
-            logger.error(f"Error {e} occurred while casting vote using token: {token}")
+            logger.error(f"Error {e} occurred while casting vote using token: {token}. Retry attempt: {attempt + 1}")
         # If this isn't the last attempt, sleep before trying again
         if attempt < MAX_RETRIES - 1:
             time.sleep(DELAY_BETWEEN_RETRIES)
