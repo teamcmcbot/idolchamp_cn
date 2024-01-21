@@ -47,5 +47,6 @@ IDC_COL_ID =
 IDC_COL_TOKEN =
 
 # NTFY config
-NTFY_HOST=
-NTFY_TOPIC=
+NTFY_HOST=http://localhost:7777/
+NTFY_TOPIC=jennie-giveaway
+PUSHOVER_URL=https://150nlg2e5f.execute-api.ap-southeast-1.amazonaws.com/v1/sendpush
